@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # sparkmate
 
 A new Flutter project.
