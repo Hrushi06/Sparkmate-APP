@@ -1,9 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:io';
-import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import 'swipe_screen.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
@@ -14,255 +14,189 @@ class ProfileSetupScreen extends StatefulWidget {
 }
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
-  File? imageFile;
-  String? uploadedPhotoUrl;
+  final _nameController = TextEditingController();
+  final _ageController = TextEditingController();
+  final _bioController = TextEditingController();
 
-  final nameController = TextEditingController();
-  final ageController = TextEditingController();
-  final bioController = TextEditingController();
+  String _selectedGender = 'Male';
+  File? _imageFile;
+  bool _isLoading = false;
 
-  String selectedGender = "Male";
-  bool isLoading = false;
-
-  Future<void> pickAndUploadImage() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-
-    if (picked == null) return;
-
-    setState(() => isLoading = true);
-
-    try {
-      setState(() {
-        imageFile = File(picked.path);
-      });
-
-      final user = FirebaseAuth.instance.currentUser!;
-      final ref = FirebaseStorage.instance
-          .ref()
-          .child("profile_images")
-          .child("${user.uid}.jpg");
-
-      await ref.putFile(imageFile!);
-      final imageUrl = await ref.getDownloadURL();
-
-      // ✅ FIXED: use set with merge instead of update
-      await FirebaseFirestore.instance
-          .collection("users")
-          .doc(user.uid)
-          .set({
-        "photoUrl": imageUrl,
-      }, SetOptions(merge: true));
-
-      setState(() => uploadedPhotoUrl = imageUrl);
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Photo uploaded ✅")),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Photo upload failed: $e")),
-      );
-    }
-
-    setState(() => isLoading = false);
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _ageController.dispose();
+    _bioController.dispose();
+    super.dispose();
   }
 
-  void saveProfile() async {
-    // ✅ Validate name
-    if (nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter your name")),
-      );
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final picked =
+        await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    if (picked == null) return;
+    setState(() => _imageFile = File(picked.path));
+  }
+
+  Future<String?> _uploadImage(String uid) async {
+    if (_imageFile == null) return null;
+    final ref = FirebaseStorage.instance
+        .ref()
+        .child('profile_images')
+        .child('$uid.jpg');
+    await ref.putFile(_imageFile!);
+    return await ref.getDownloadURL();
+  }
+
+  Future<void> _saveProfile() async {
+    final name = _nameController.text.trim();
+    final ageText = _ageController.text.trim();
+    final bio = _bioController.text.trim();
+
+    if (name.isEmpty || ageText.isEmpty || bio.isEmpty) {
+      _showSnack('Please fill in all fields');
       return;
     }
 
-    // ✅ Validate age
-    if (ageController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter your age")),
-      );
-      return;
-    }
-
-    // ✅ Validate age is a valid number
-    final age = int.tryParse(ageController.text.trim());
+    final age = int.tryParse(ageText);
     if (age == null || age < 18 || age > 100) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a valid age (18-100)")),
-      );
+      _showSnack('Please enter a valid age (18–100)');
       return;
     }
 
-    // ✅ Validate bio
-    if (bioController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter your bio")),
-      );
-      return;
-    }
-
-    setState(() => isLoading = true);
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    setState(() => _isLoading = true);
 
     try {
-      // ✅ FIXED: use set with merge: true
-      // This creates the document if it doesn't exist,
-      // or updates it if it already exists — no more not-found error!
-      await FirebaseFirestore.instance
-          .collection("users")
-          .doc(user.uid)
-          .set({
-        "uid": user.uid,
-        "email": user.email ?? "",
-        "name": nameController.text.trim(),
-        "age": age,
-        "gender": selectedGender,
-        "bio": bioController.text.trim(),
-        "profileCompleted": true,
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final photoUrl = await _uploadImage(uid);
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'uid': uid,
+        'name': name,
+        'age': age,
+        'gender': _selectedGender,
+        'bio': bio,
+        'photoUrl': photoUrl ?? '',
+        'profileCompleted': true,
+        'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Profile saved 🎉")),
-      );
 
-      // ✅ Navigate to SwipeScreen
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const SwipeScreen()),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to save profile: $e")),
-      );
+      _showSnack('Error saving profile: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-
-    setState(() => isLoading = false);
   }
 
-  @override
-  void dispose() {
-    nameController.dispose();
-    ageController.dispose();
-    bioController.dispose();
-    super.dispose();
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Set up your profile"),
-        backgroundColor: Colors.pink,
-        foregroundColor: Colors.white,
+        title: const Text('Set Up Profile'),
+        centerTitle: true,
+        automaticallyImplyLeading: false,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              const SizedBox(height: 10),
-
-              // ✅ Profile image picker
-              GestureDetector(
-                onTap: isLoading ? null : pickAndUploadImage,
-                child: CircleAvatar(
-                  radius: 55,
-                  backgroundColor: Colors.pink.shade100,
-                  backgroundImage:
-                      imageFile != null ? FileImage(imageFile!) : null,
-                  child: imageFile == null
-                      ? const Icon(Icons.camera_alt,
-                          size: 35, color: Colors.pink)
-                      : null,
-                ),
+        child: Column(
+          children: [
+            GestureDetector(
+              onTap: _pickImage,
+              child: CircleAvatar(
+                radius: 60,
+                backgroundColor: scheme.primaryContainer,
+                backgroundImage:
+                    _imageFile != null ? FileImage(_imageFile!) : null,
+                child: _imageFile == null
+                    ? Icon(Icons.camera_alt,
+                        size: 36, color: scheme.onPrimaryContainer)
+                    : null,
               ),
-              const SizedBox(height: 8),
-              const Text(
-                "Tap to add photo",
-                style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            Text('Tap to add photo',
+                style: TextStyle(color: scheme.outline)),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                labelText: 'Name',
+                prefixIcon: const Icon(Icons.person_outline),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
-              const SizedBox(height: 24),
-
-              // ✅ Name field
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: "Name",
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
-                ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _ageController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Age',
+                prefixIcon: const Icon(Icons.cake_outlined),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
-              const SizedBox(height: 16),
-
-              // ✅ Age field
-              TextField(
-                controller: ageController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "Age",
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.cake),
-                ),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedGender,
+              decoration: InputDecoration(
+                labelText: 'Gender',
+                prefixIcon: const Icon(Icons.people_outline),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
-              const SizedBox(height: 16),
-
-              // ✅ Gender dropdown
-              DropdownButtonFormField<String>(
-                value: selectedGender,
-                items: const [
-                  DropdownMenuItem(value: "Male", child: Text("Male")),
-                  DropdownMenuItem(value: "Female", child: Text("Female")),
-                  DropdownMenuItem(value: "Other", child: Text("Other")),
-                ],
-                onChanged: (value) {
-                  setState(() => selectedGender = value!);
-                },
-                decoration: const InputDecoration(
-                  labelText: "Gender",
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.people),
-                ),
+              items: const [
+                DropdownMenuItem(value: 'Male', child: Text('Male')),
+                DropdownMenuItem(value: 'Female', child: Text('Female')),
+                DropdownMenuItem(value: 'Other', child: Text('Other')),
+              ],
+              onChanged: (v) => setState(() => _selectedGender = v!),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _bioController,
+              maxLines: 3,
+              maxLength: 150,
+              decoration: InputDecoration(
+                labelText: 'Bio',
+                prefixIcon: const Icon(Icons.edit_outlined),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
-              const SizedBox(height: 16),
-
-              // ✅ Bio field
-              TextField(
-                controller: bioController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: "Bio",
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.edit),
-                ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: FilledButton(
+                onPressed: _isLoading ? null : _saveProfile,
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Text('Save Profile',
+                        style: TextStyle(fontSize: 16)),
               ),
-              const SizedBox(height: 30),
-
-              // ✅ Save button
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.pink,
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-                onPressed: isLoading ? null : saveProfile,
-                child: isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        "Save Profile",
-                        style: TextStyle(fontSize: 16, color: Colors.white),
-                      ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

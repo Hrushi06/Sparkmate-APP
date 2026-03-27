@@ -4,137 +4,123 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'chat_screen.dart';
 
 class MatchListScreen extends StatelessWidget {
-  MatchListScreen({super.key});
-
-  final currentUser = FirebaseAuth.instance.currentUser!;
+  const MatchListScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Your Matches 💘"),
-        backgroundColor: Colors.pink,
-        foregroundColor: Colors.white,
+        title: const Text('Your Matches 💘'),
+        centerTitle: true,
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection("matches")
-            .doc(currentUser.uid)
-            .collection("users")
-            .orderBy("matchedAt", descending: true)
+            .collection('matches')
+            .doc(uid)
+            .collection('users')
+            .orderBy('matchedAt', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(
+          final docs = snapshot.data?.docs ?? [];
+
+          if (docs.isEmpty) {
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.favorite_border, size: 80, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    "No matches yet 💔",
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    "Keep swiping to find your spark!",
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
+                  Icon(Icons.favorite_border,
+                      size: 72, color: Colors.grey.shade400),
+                  const SizedBox(height: 16),
+                  Text('No matches yet',
+                      style: TextStyle(
+                          fontSize: 20, color: Colors.grey.shade600)),
+                  const SizedBox(height: 8),
+                  Text('Keep swiping! 💪',
+                      style: TextStyle(color: Colors.grey.shade500)),
                 ],
               ),
             );
           }
 
-          final matches = snapshot.data!.docs;
-
           return ListView.builder(
-            itemCount: matches.length,
+            itemCount: docs.length,
+            padding: const EdgeInsets.symmetric(vertical: 8),
             itemBuilder: (context, index) {
-              final matchUserId = matches[index].id;
-
-              return FutureBuilder<DocumentSnapshot>(
-                future: FirebaseFirestore.instance
-                    .collection("users")
-                    .doc(matchUserId)
-                    .get(),
-                builder: (context, userSnap) {
-                  // ✅ Show shimmer placeholder while loading
-                  if (!userSnap.hasData) {
-                    return const ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.pink,
-                        child: Icon(Icons.person, color: Colors.white),
-                      ),
-                      title: Text("Loading..."),
-                    );
-                  }
-
-                  // ✅ Safe null check on user data
-                  if (!userSnap.data!.exists) return const SizedBox();
-
-                  final userData =
-                      userSnap.data!.data() as Map<String, dynamic>;
-
-                  return Card(
-                    margin: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 3,
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      leading: CircleAvatar(
-                        radius: 28,
-                        backgroundColor: Colors.pink.shade100,
-                        // ✅ Safe null check on photoUrl
-                        backgroundImage:
-                            userData["photoUrl"] != null &&
-                                    userData["photoUrl"] != ""
-                                ? NetworkImage(userData["photoUrl"])
-                                : null,
-                        child: userData["photoUrl"] == null ||
-                                userData["photoUrl"] == ""
-                            ? const Icon(Icons.person, color: Colors.pink)
-                            : null,
-                      ),
-                      title: Text(
-                        userData["name"] ?? "User",
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text(
-                        "${userData["age"] ?? ""} • ${userData["gender"] ?? ""}",
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                      trailing: const Icon(
-                        Icons.chat_bubble_outline,
-                        color: Colors.pink,
-                      ),
-                      // ✅ Open chat screen on tap
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatScreen(
-                              otherUserId: matchUserId,
-                              otherUserName: userData["name"] ?? "User",
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
-              );
+              final matchUserId = docs[index].id;
+              return _MatchTile(
+                  matchUserId: matchUserId, currentUid: uid);
             },
           );
         },
       ),
+    );
+  }
+}
+
+class _MatchTile extends StatelessWidget {
+  final String matchUserId;
+  final String currentUid;
+
+  const _MatchTile(
+      {required this.matchUserId, required this.currentUid});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance
+          .collection('users')
+          .doc(matchUserId)
+          .get(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const ListTile(
+            leading: CircleAvatar(child: Icon(Icons.person)),
+            title: Text('Loading...'),
+          );
+        }
+
+        final data = snapshot.data!.data() as Map<String, dynamic>?;
+        if (data == null) return const SizedBox();
+
+        final name = data['name'] as String? ?? 'User';
+        final photoUrl = data['photoUrl'] as String? ?? '';
+        final age = data['age'];
+
+        return ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: CircleAvatar(
+            radius: 28,
+            backgroundImage:
+                photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+            child:
+                photoUrl.isEmpty ? const Icon(Icons.person) : null,
+          ),
+          title:
+              Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: Text(
+              age != null ? 'Age $age • It\'s a match 💘' : 'It\'s a match 💘'),
+          trailing:
+              const Icon(Icons.chat_bubble_outline, color: Colors.pink),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatScreen(
+                  otherUserId: matchUserId,
+                  otherUserName: name,
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

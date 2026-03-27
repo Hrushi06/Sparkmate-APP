@@ -12,51 +12,56 @@ class AuthGate extends StatelessWidget {
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        // ⏳ Checking auth state
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+      builder: (context, authSnapshot) {
+        if (authSnapshot.connectionState == ConnectionState.waiting) {
+          return const _LoadingScreen();
         }
 
-        // ❌ NOT LOGGED IN → LOGIN SCREEN
-        if (!snapshot.hasData) {
+        if (authSnapshot.data == null) {
           return const EmailLoginScreen();
         }
 
-        // ✅ LOGGED IN → CHECK PROFILE
-        final user = snapshot.data!;
+        final uid = authSnapshot.data!.uid;
 
         return FutureBuilder<DocumentSnapshot>(
           future: FirebaseFirestore.instance
-              .collection("users")
-              .doc(user.uid)
+              .collection('users')
+              .doc(uid)
               .get(),
-          builder: (context, profileSnap) {
-            if (profileSnap.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
+          builder: (context, userSnapshot) {
+            if (userSnapshot.connectionState == ConnectionState.waiting) {
+              return const _LoadingScreen();
             }
 
             final data =
-                profileSnap.data?.data() as Map<String, dynamic>?;
+                userSnapshot.data?.data() as Map<String, dynamic>?;
 
-            // ❌ PROFILE NOT COMPLETE → PROFILE SETUP
-            if (data == null ||
-                data["name"] == null ||
-                data["age"] == null ||
-                data["gender"] == null ||
-                data["bio"] == null) {
+            final hasProfile = data != null &&
+                data['name'] != null &&
+                data['age'] != null &&
+                data['bio'] != null;
+
+            if (!hasProfile) {
               return const ProfileSetupScreen();
             }
 
-            // ✅ PROFILE COMPLETE → SWIPE SCREEN
             return const SwipeScreen();
           },
         );
       },
+    );
+  }
+}
+
+class _LoadingScreen extends StatelessWidget {
+  const _LoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
     );
   }
 }

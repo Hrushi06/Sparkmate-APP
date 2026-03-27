@@ -21,77 +21,59 @@ class MatchPopupScreen extends StatelessWidget {
             const Text(
               "🎉 IT'S A MATCH!",
               style: TextStyle(
-                color: Colors.pink,
-                fontSize: 36,
+                color: Colors.pinkAccent,
+                fontSize: 32,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 2,
               ),
             ),
-            const SizedBox(height: 10),
-            const Text(
-              "You and this person liked each other!",
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-            const SizedBox(height: 40),
-
-            // ✅ Safe photoUrl check
-            photoUrl.isNotEmpty
-                ? CircleAvatar(
-                    radius: 75,
-                    backgroundImage: NetworkImage(photoUrl),
-                  )
-                : const CircleAvatar(
-                    radius: 75,
-                    backgroundColor: Colors.pink,
-                    child: Icon(Icons.person, size: 70, color: Colors.white),
-                  ),
-
+            const SizedBox(height: 30),
+            if (photoUrl.isNotEmpty)
+              CircleAvatar(
+                radius: 70,
+                backgroundImage: NetworkImage(photoUrl),
+              )
+            else
+              const CircleAvatar(
+                radius: 70,
+                backgroundColor: Colors.pinkAccent,
+                child: Icon(Icons.person, size: 70, color: Colors.white),
+              ),
             const SizedBox(height: 20),
             Text(
-              name.isNotEmpty ? name : "Someone",
+              name,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 26,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             const Text(
-              "Start a conversation now 💬",
-              style: TextStyle(color: Colors.white60, fontSize: 14),
+              "You both liked each other!",
+              style: TextStyle(color: Colors.white70, fontSize: 16),
             ),
-            const SizedBox(height: 50),
-
-            // ✅ Start Chat button
-            ElevatedButton.icon(
+            const SizedBox(height: 40),
+            ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.pink,
+                backgroundColor: Colors.pinkAccent,
                 padding: const EdgeInsets.symmetric(
                     horizontal: 40, vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
               ),
-              icon: const Icon(Icons.chat_bubble, color: Colors.white),
-              label: const Text(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
                 "Start Chat 💬",
-                style: TextStyle(fontSize: 16, color: Colors.white),
+                style: TextStyle(fontSize: 16),
               ),
-              onPressed: () {
-                Navigator.pop(context);
-              },
             ),
-
             const SizedBox(height: 16),
-
-            // ✅ Keep swiping button
             TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
+              onPressed: () => Navigator.pop(context),
               child: const Text(
                 "Keep Swiping",
-                style: TextStyle(color: Colors.white60, fontSize: 14),
+                style: TextStyle(color: Colors.white70),
               ),
             ),
           ],

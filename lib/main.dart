@@ -20,7 +20,12 @@ class SparkMateApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'SparkMate',
       theme: ThemeData(
-        primarySwatch: Colors.pink,
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFE91E8C),
+          brightness: Brightness.light,
+        ),
+        fontFamily: 'Roboto',
       ),
       home: const AuthGate(),
     );

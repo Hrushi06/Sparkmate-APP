@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'profile_setup_screen.dart';
+import 'swipe_screen.dart';
 
 class EmailLoginScreen extends StatefulWidget {
   const EmailLoginScreen({super.key});
@@ -10,117 +12,221 @@ class EmailLoginScreen extends StatefulWidget {
 }
 
 class _EmailLoginScreenState extends State<EmailLoginScreen> {
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
-  bool isLogin = true;
-  bool isLoading = false;
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLogin = true;
+  bool _isLoading = false;
+  bool _obscurePassword = true;
 
-  void submit() async {
-    // ✅ Basic validation
-    if (emailController.text.trim().isEmpty ||
-        passwordController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill in all fields")),
-      );
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      _showSnack('Please fill in all fields');
       return;
     }
 
-    setState(() => isLoading = true);
+    setState(() => _isLoading = true);
 
     try {
-      if (isLogin) {
-        // ✅ Just login — AuthGate will handle navigation automatically
+      if (_isLogin) {
         await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: emailController.text.trim(),
-          password: passwordController.text.trim(),
+          email: email,
+          password: password,
+        );
+
+        if (!mounted) return;
+
+        final uid = FirebaseAuth.instance.currentUser!.uid;
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .get();
+
+        if (!mounted) return;
+
+        final data = doc.data();
+        final hasProfile = data != null &&
+            data['name'] != null &&
+            data['age'] != null &&
+            data['bio'] != null;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                hasProfile ? const SwipeScreen() : const ProfileSetupScreen(),
+          ),
         );
       } else {
-        // ✅ Register new user
-        final userCredential = await FirebaseAuth.instance
+        final credential = await FirebaseAuth.instance
             .createUserWithEmailAndPassword(
-          email: emailController.text.trim(),
-          password: passwordController.text.trim(),
+          email: email,
+          password: password,
         );
 
-        // ✅ Save initial user data to Firestore
         await FirebaseFirestore.instance
-            .collection("users")
-            .doc(userCredential.user!.uid)
+            .collection('users')
+            .doc(credential.user!.uid)
             .set({
-          "uid": userCredential.user!.uid,
-          "email": emailController.text.trim(),
-          "createdAt": FieldValue.serverTimestamp(),
+          'uid': credential.user!.uid,
+          'email': email,
+          'createdAt': FieldValue.serverTimestamp(),
         });
+
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (_) => const ProfileSetupScreen()),
+        );
       }
-
-      // ✅ NO manual navigation here — AuthGate handles it automatically
-
     } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? "Something went wrong")),
-      );
+      if (!mounted) return;
+      _showSnack(e.message ?? 'Authentication error');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
 
-    setState(() => isLoading = false);
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.favorite, color: Colors.pink, size: 60),
-            const SizedBox(height: 16),
-            Text(
-              isLogin ? "Welcome Back 🔥" : "Create Account",
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              scheme.primary,
+              scheme.primary.withOpacity(0.6),
+              Colors.white,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.favorite,
+                      size: 64, color: Colors.white),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'SparkMate',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Find your spark ✨',
+                    style: TextStyle(color: Colors.white70, fontSize: 16),
+                  ),
+                  const SizedBox(height: 40),
+                  Card(
+                    elevation: 8,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        children: [
+                          Text(
+                            _isLogin ? 'Welcome Back' : 'Create Account',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: scheme.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          TextField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: InputDecoration(
+                              labelText: 'Email',
+                              prefixIcon: const Icon(Icons.email_outlined),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              prefixIcon: const Icon(Icons.lock_outlined),
+                              suffixIcon: IconButton(
+                                icon: Icon(_obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined),
+                                onPressed: () => setState(
+                                    () => _obscurePassword = !_obscurePassword),
+                              ),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: FilledButton(
+                              onPressed: _isLoading ? null : _submit,
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2),
+                                    )
+                                  : Text(
+                                      _isLogin ? 'Login' : 'Sign Up',
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextButton(
+                            onPressed: () =>
+                                setState(() => _isLogin = !_isLogin),
+                            child: Text(
+                              _isLogin
+                                  ? "Don't have an account? Sign Up"
+                                  : 'Already have an account? Login',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 30),
-            TextField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: "Email",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: "Password",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 30),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.pink,
-                minimumSize: const Size(double.infinity, 50),
-              ),
-              onPressed: isLoading ? null : submit,
-              child: isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : Text(isLogin ? "Login" : "Sign Up"),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() => isLogin = !isLogin);
-              },
-              child: Text(
-                isLogin
-                    ? "Don't have an account? Sign up"
-                    : "Already have an account? Login",
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
