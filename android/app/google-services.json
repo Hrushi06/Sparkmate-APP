@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "900859690726",
+    "project_id": "sparkmate1",
+    "storage_bucket": "sparkmate1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:900859690726:android:3a6a3d10ac0f319cf74527",
+        "android_client_info": {
+          "package_name": "com.example.sparkmate"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZ1yollAOxhEuXNqbFhO0lqfb3yftlrRk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

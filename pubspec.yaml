@@ -1,0 +1,48 @@
+name: sparkmate
+description: "SparkMate - A modern dating app like Tinder/Bumble"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # 🔥 Firebase Core
+  firebase_core: ^2.27.0
+
+  # 🔐 Firebase Authentication (Phone / Google)
+  firebase_auth: ^4.17.0
+
+  # 🗂️ Firestore Database (Users, Matches, Chats)
+  cloud_firestore: ^4.15.0
+
+  # 🖼️ Firebase Storage (Profile Photos)
+  firebase_storage: ^11.6.0
+
+  # ❤️ Swipe Cards (Tinder-style swipe)
+  swipe_cards: ^2.0.0
+
+  # 📍 Location (for nearby users – later)
+  geolocator: ^10.1.0
+
+  # 🔔 Push Notifications (later)
+  firebase_messaging: ^14.7.10
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+  image_picker: ^1.0.7
+  swipe_cards: ^2.0.0
+
+
+
+flutter:
+  uses-material-design: true
